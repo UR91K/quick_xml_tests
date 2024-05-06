@@ -1,0 +1,8 @@
+[package]
+name = "quick_xml_tests"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+quick-xml = "0.31.0"
+flate2 = "1.0.30"
