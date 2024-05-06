@@ -4,7 +4,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use flate2::read::GzDecoder;
 use std::io::Write;
-use std::env;
+use std::{env, fs};
 
 use quick_xml::Reader;
 use quick_xml::events::Event;
@@ -86,6 +86,13 @@ fn remove_tags(xml_data: Vec<u8>, tags_to_delete: Vec<&[u8]>, tag_to_search: Opt
     writer.into_inner().into_inner()
 }
 
+fn load_file_data(file_path: &Path) -> Result<Vec<u8>, String> {
+    match fs::read(file_path) {
+        Ok(data) => Ok(data),
+        Err(err) => Err(format!("Failed to read file {}: {}", file_path.display(), err)),
+    }
+}
+
 fn decode_als_data(file_path: &Path) -> Result<Vec<u8>, String> {
     let mut file = match File::open(&file_path) {
         Ok(file) => file,
@@ -101,18 +108,19 @@ fn decode_als_data(file_path: &Path) -> Result<Vec<u8>, String> {
 
 fn main() {
     let current_dir = env::current_dir().expect("Failed to get current directory");
-    println!("{:?}", current_dir);
-    let file_path: PathBuf = current_dir.join("4 catjam.als");
 
-    let decompressed_data = decode_als_data(&file_path).unwrap();
+    let file_path: PathBuf = current_dir.join("input.xml");
+
+    // let data = decode_als_data(&file_path).unwrap();
+    let data = load_file_data(&file_path).unwrap();
 
     let mut file = File::create("output.xml").expect("Unable to create file");
 
     let tags_to_delete = vec![
-        "SideChain".as_bytes()
+        "Sidechain".as_bytes()
     ];
 
-    let modified_xml_data = remove_tags(decompressed_data, tags_to_delete, None);
+    let modified_xml_data = remove_tags(data, tags_to_delete, None);
 
     file.write_all(&modified_xml_data).expect("Unable to write data to file");
 }
