@@ -1,11 +1,45 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<PluginDevice Id="0">
-    <PluginDesc>
-        <Vst3PluginInfo Id="0">
-            <Name Value="Omnisphere" />
-        </Vst3PluginInfo>
-    </PluginDesc>
-    <MpeEnabled Value="false" />
-    <AxisX Value="0" />
-    <AxisY Value="0" />
-</PluginDevice>
+<Ableton MajorVersion="5" MinorVersion="11.0_433" SchemaChangeCount="6" Creator="Ableton Live 11.0.11" Revision="6a1c879bfb313ba56389eba66fb26a216f80d2b1">
+    <LiveSet>
+        <NextPointeeId Value="22518" />
+        <OverwriteProtectionNumber Value="2816" />
+        <LomId Value="0" />
+        <LomIdView Value="0" />
+        <Tracks>
+            <MidiTrack Id="12">
+                <LomId Value="0" />
+                <LomIdView Value="0" />
+                <DeviceChain>
+                    <DeviceChain>
+                        <Devices>
+                            <PluginDevice Id="0">
+                                <LomId Value="0" />
+                                <LomIdView Value="0" />
+                                <SourceContext>
+                                    <Value>
+                                        <BranchSourceContext Id="0">
+                                            <OriginalFileRef />
+                                            <BrowserContentPath Value="query:Plugins#VST:Custom:XLN%20Audio:XO" />
+                                            <PresetRef />
+                                            <BranchDeviceId Value="device:vst:instr:2017548367?n=XO" />
+                                        </BranchSourceContext>
+                                    </Value>
+                                </SourceContext>
+                                <PluginDesc>
+                                    <VstPluginInfo Id="0">
+                                        <WinPosX Value="64" />
+                                        <WinPosY Value="143" />
+                                        <Path Value="C:/Program Files/Steinberg/VSTPlugins/XLN Audio/XO.dll" />
+                                        <PlugName Value="XO" />
+                                        <UniqueId Value="2017548367" />
+                                    </VstPluginInfo>
+                                </PluginDesc>
+                                <MpeEnabled Value="false" />
+                            </PluginDevice>
+                        </Devices>
+                    </DeviceChain>
+                </DeviceChain>
+            </MidiTrack>
+        </Tracks>
+    </LiveSet>
+</Ableton>
