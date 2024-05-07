@@ -1,90 +1,12 @@
-use quick_xml::name::QName;
 use std::fs::File;
-use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::io::{Read, Write, Cursor};
+use std::path::Path;
+use std::fs;
+
 use flate2::read::GzDecoder;
-use std::io::Write;
-use std::{env, fs};
-
 use quick_xml::Reader;
-use quick_xml::events::Event;
+use quick_xml::events::{BytesText, Event};
 use quick_xml::Writer;
-use std::io::Cursor;
-
-fn remove_tags(xml_data: Vec<u8>, tags_to_delete: Vec<&[u8]>, tag_to_search: Option<&[u8]>) -> Vec<u8> {
-    let mut reader = Reader::from_reader(Cursor::new(xml_data));
-    reader.trim_text(true);
-
-    let mut writer = Writer::new(Cursor::new(Vec::new()));
-
-    let mut buf = Vec::new();
-    let mut in_target_tag = false;
-    let mut depth = 0;
-
-    loop {
-        match reader.read_event_into(&mut buf) {
-            Ok(Event::Start(ref event)) => {
-                if let tag = tag_to_search.as_ref().map(|arg0: &&[u8]| QName(*arg0)) {
-                    if let name = event.name() {
-                        if let Some(QName(tag_bytes)) = tag {
-                            if name == QName(tag_bytes) {
-                                in_target_tag = true;
-                                depth += 1;
-                            }
-                        }
-                    }
-                }
-                if !in_target_tag && !tags_to_delete.iter().any(|&tag| {
-                    if let name = event.name() {
-                        name.into_inner() == tag
-                    } else {
-                        false
-                    }
-                }) {
-                    writer.write_event(&Event::Start(event.clone())).unwrap();
-                }
-                if in_target_tag {
-                    depth += 1;
-                }
-            }
-            Ok(Event::End(ref event)) => {
-                if let Some(tag) = tag_to_search.as_ref().map(|arg0: &&[u8]| QName(*arg0)) {
-                    if let name = event.name() {
-                        if name == tag {
-                            in_target_tag = false;
-                            depth -= 1;
-                        }
-                    }
-                }
-                if !in_target_tag && !tags_to_delete.iter().any(|&tag| {
-                    if let name = event.name() {
-                        name.into_inner() == tag
-                    } else {
-                        false
-                    }
-                }) {
-                    writer.write_event(&Event::End(event.clone())).unwrap();
-                }
-                if in_target_tag {
-                    depth -= 1;
-                }
-            }
-            Ok(Event::Eof) => break,
-            Ok(event) => {
-                if !in_target_tag {
-                    writer.write_event(&event).unwrap();
-                }
-            }
-            Err(e) => panic!("Error at position {}: {:?}", reader.buffer_position(), e),
-        }
-
-        if depth == 0 {
-            buf.clear();
-        }
-    }
-
-    writer.into_inner().into_inner()
-}
 
 fn load_file_data(file_path: &Path) -> Result<Vec<u8>, String> {
     match fs::read(file_path) {
@@ -106,21 +28,87 @@ fn decode_als_data(file_path: &Path) -> Result<Vec<u8>, String> {
     Ok(decompressed_data)
 }
 
+fn remove_tags(xml_data: Vec<u8>, tags_to_delete: Vec<&str>) -> Vec<u8> {
+    let mut reader = Reader::from_reader(xml_data.as_slice());
+    reader.trim_text(true);
+
+    let mut writer = Writer::new(Cursor::new(Vec::new()));
+    let mut buf = Vec::new();
+
+    let mut in_target_tag = false;
+    let mut depth = 0;
+    let mut indent = String::new();
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(ref event)) => {
+                let name = event.name();
+                let name_str = std::str::from_utf8(name.as_ref()).unwrap();
+                if tags_to_delete.iter().any(|&tag| tag == name_str) {
+                    in_target_tag = true;
+                    depth = 1;
+                } else if !in_target_tag {
+                    writer.write_event(&Event::Text(BytesText::new(&indent))).unwrap();
+                    writer.write_event(&Event::Start(event.clone())).unwrap();
+                    writer.write_event(&Event::Text(BytesText::new("\n"))).unwrap();
+                    indent.push_str("    ");
+                } else {
+                    depth += 1;
+                }
+            }
+            Ok(Event::End(ref event)) => {
+                let name = event.name();
+                let name_str = std::str::from_utf8(name.as_ref()).unwrap();
+                if in_target_tag {
+                    depth -= 1;
+                    if depth == 0 {
+                        in_target_tag = false;
+                    }
+                } else if !tags_to_delete.iter().any(|&tag| tag == name_str) {
+                    if indent.len() >= 4 {
+                        indent.truncate(indent.len() - 4);
+                    }
+                    writer.write_event(&Event::Text(BytesText::new(&indent))).unwrap();
+                    writer.write_event(&Event::End(event.clone())).unwrap();
+                    writer.write_event(&Event::Text(BytesText::new("\n"))).unwrap();
+                }
+            }
+            Ok(Event::Text(ref event)) => {
+                if !in_target_tag {
+                    writer.write_event(&Event::Text(event.clone())).unwrap();
+                }
+            }
+            Ok(Event::Empty(ref event)) => {
+                let name = event.name();
+                let name_str = std::str::from_utf8(name.as_ref()).unwrap();
+                if !tags_to_delete.iter().any(|&tag| tag == name_str) && !in_target_tag {
+                    writer.write_event(&Event::Text(BytesText::new(&indent))).unwrap();
+                    writer.write_event(&Event::Empty(event.clone())).unwrap();
+                    writer.write_event(&Event::Text(BytesText::new("\n"))).unwrap();
+                }
+            }
+            Ok(Event::Eof) => break,
+            _ => (),
+        }
+        buf.clear();
+    }
+
+    writer.into_inner().into_inner()
+}
+
 fn main() {
-    let current_dir = env::current_dir().expect("Failed to get current directory");
+    let input_file = "input.xml";
+    let output_file = "output.xml";
 
-    let file_path: PathBuf = current_dir.join("input.xml");
+    let file_path = Path::new(input_file);
+    let xml_data = fs::read(file_path).expect("Unable to read file");
 
-    // let data = decode_als_data(&file_path).unwrap();
-    let data = load_file_data(&file_path).unwrap();
+    let tags_to_delete = vec!["SideChain"];
+    let modified_xml_data = remove_tags(xml_data, tags_to_delete);
 
-    let mut file = File::create("output.xml").expect("Unable to create file");
+    let mut file = File::create(output_file).expect("Unable to create file");
+    file.write_all(&modified_xml_data)
+        .expect("Unable to write data to file");
 
-    let tags_to_delete = vec![
-        "Sidechain".as_bytes()
-    ];
-
-    let modified_xml_data = remove_tags(data, tags_to_delete, None);
-
-    file.write_all(&modified_xml_data).expect("Unable to write data to file");
+    println!("Output written to {}", output_file);
 }
